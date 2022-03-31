@@ -12,6 +12,8 @@ contract VentiStake is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
+    IERC20 private _stakingToken; // Staking token
+
     uint256 private _totalSupply; // Total staked amount
     uint256 private _baseMultiplier = 100; // base multiplier is 100 aka 1.00%
     mapping (address => UserDeposit) private _deposits; // Track all user deposits
