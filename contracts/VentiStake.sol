@@ -35,38 +35,101 @@ contract VentiStake is Ownable {
     // ===== VIEW FUNCTIONS ===== //
 
     /**
-     @dev Returns total amount staked
+     * @dev Check total amount staked
+     *
+     * @return totalSupply the total amount staked
      */
     function totalSupply() external view returns (uint256)
     {
         return _totalSupply;
     }
 
+    /**
+     * @dev Check total rewards amount
+     *
+     * @notice this assumes that staking token is the same as reward token
+     *
+     * @return totalRewards the total balance of contract - amount staked
+     */
     function totalRewards() external view returns (uint256)
     {
         return stakingToken.balanceOf(address(this)).sub(_totalSupply);
     }
 
+    /**
+     * @dev Check base multiplier of contract
+     *
+     * @notice Normalized to 1e18 = 100%. Contract currently uses a 1x, 2x, and 3x multiplier
+     * based on how long the user locks their stake for (in UserDeposit struct).
+     * Therefore max baseMultiplier would be <= 333e15 (33.3%).
+     *
+     * @return baseMultiplier 1e18 normalized percentage to start 
+     */
     function baseMultiplier() external view returns (uint256)
     {
         return _baseMultiplier;
     }
 
+    /**
+     * @dev Checks amount staked for account.
+     *
+     * @param account the user account to look up.
+     *
+     * @return staked the total amount staked from account.
+     */
     function depositOf(address account) external view returns (uint256)
     {
         return _deposits[account].staked;
     }
 
+    /**
+     * @dev Checks all user deposit data for account.
+     *
+     * @param account the user account to look up.
+     *
+     * @return userDeposit the entire deposit data.
+     */
+    function getDeposit(address account) external view returns (UserDeposit memory)
+    {
+        return _deposits[account];
+    }
+
+    /**
+     * @dev Checks if staking contract is active.
+     *
+     * @notice _isActive is stored as uint where 0 = false; 1 = true.
+     *
+     * @return isActive boolean true if 1; false if not.
+     */
     function isActive() external view returns (bool)
     {
         return _isActive == 1;
     }
 
+    /**
+     * @dev Checks when staking finished.
+     *
+     * @notice if 0, staking is still active.
+     *
+     * @return timeFinished the block timestamp of when staking completed.
+     */
     function timeEnded() external view returns (uint256)
     {
         return _timeFinished;
     }
 
+    /**
+     * @dev Checks pending rewards currently accumulating for month.
+     *
+     * @notice These rewards are prorated for the current period (month).
+     * Users cannot withdraw rewards until a full month has passed.
+     * If a user makes an additional deposit mid-month, these pending rewards
+     * will be added to their new staked amount, and lock time reset.
+     *
+     * @param account the user account to use for calculation.
+     *
+     * @return pending the pending reward for the current period.
+     */
     function pendingReward(address account) public view returns (uint256)
     {
         // If staking rewards are finished, should always return 0
@@ -92,6 +155,20 @@ contract VentiStake is Ownable {
         return pending;
     }
 
+    /**
+     * @dev Checks current earned rewards for account.
+     *
+     * @notice These rewards are calculated by the number of full months
+     * passed since deposit, based on the multiplier set by the user based on
+     * lockup time (i.e. 1x for 1 month, 2x for 3 months, 3x for 6 months).
+     * This function subtracts withdrawn rewards from the calculation so if
+     * total rewards are 100 coins, but 50 are withdrawn,
+     * it should return 50.
+     *
+     * @param account the user account to use for calculation.
+     *
+     * @return totalReward the total rewards the user has earned.
+     */
     function earned(address account) public view returns (uint256)
     {
         // Get deposit record for account
@@ -108,16 +185,26 @@ contract VentiStake is Ownable {
         if (monthsPassed == 0) return 0;
 
         // Calculate total earned - amount already paid
-        uint256 monthlyReward = userDeposit.staked
+        uint256 totalReward = userDeposit.staked
             .mul(
                 _baseMultiplier
                 .mul(uint256(userDeposit.lock)
             ).mul(monthsPassed)
             ).div(1e18).sub(rewardPaid);
 
-        return monthlyReward;
+        return totalReward;
     }
 
+    /**
+     * @dev Check if user can withdraw their stake.
+     *
+     * @notice uses the user's lock chosen on deposit, multiplied
+     * by the amount of seconds in a month.
+     *
+     * @param account the user account to check.
+     *
+     * @return canWithdraw boolean value determining if user can withdraw stake.
+     */
     function withdrawable(address account) public view returns (bool)
     {
         UserDeposit memory userDeposit = _deposits[account];
@@ -130,6 +217,14 @@ contract VentiStake is Ownable {
         }
     }
 
+    /**
+     * @dev Check if current time past lock time.
+     *
+     * @param timestamp the user's initial lock time.
+     * @param lock the lock multiplier chosen (1 = 1 month, 2 = 3 month, 3 = 6 month).
+     *
+     * @return unlockTime the timestamp after which a user can withdraw.
+     */
     function _getUnlockTime(uint64 timestamp, uint8 lock) private pure returns (uint256)
     {
         if (lock == 1) {
@@ -146,6 +241,12 @@ contract VentiStake is Ownable {
 
     // ===== MUTATIVE FUNCTIONS ===== //
 
+    /**
+     * @dev Deposit and stake funds
+     *
+     * @param amount the amount of tokens to stake
+     * @param lock the lock multiplier (1 = 1 month, 2 = 3 month, 3 = 6 month).
+     */
     function deposit(uint256 amount, uint8 lock) external
     {
         // Check if staking is active
@@ -174,6 +275,13 @@ contract VentiStake is Ownable {
         });
     }
 
+    /**
+     * @dev Withdraws a user's stake.
+     *
+     * @param amount the amount to withdraw.
+     *
+     * @notice must be past unlock time.
+     */
     function withdraw(uint256 amount) external
     {
         // Get user deposit info
@@ -219,6 +327,9 @@ contract VentiStake is Ownable {
         stakingToken.safeTransfer(msg.sender, amountToWithdraw);
     }
 
+    /**
+     * @dev Claims earned rewards.
+     */
     function claimRewards() external
     {
         // Get user's earned rewards
