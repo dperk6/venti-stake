@@ -343,6 +343,45 @@ contract VentiStake is Ownable {
 
     }
 
+    /**
+     * @dev Updates the base multiplier
+     *
+     * @param newMultiplier the updated reward multiplier
+     *
+     * @notice There is currently no means of tracking previous changes.
+     * This will impact all pending rewards and unclaimed earnings.
+     * Update TBD.
+     */
+    function updateMultiplier(uint256 newMultiplier) external onlyOwner
+    {
+        require(newMultiplier != 0, "Multiplier cannot be 0");
+        require(newMultiplier < 33e16, "Multiplier must be lower than 33e15");
+
+        _baseMultiplier = newMultiplier;
+    }
+
+    /**
+     * @dev Closes reward period
+     *
+     * @notice This is a one-way function. Once staking is closed, it
+     * cannot be re-enabled. Use cautiously.
+     */
+    function closeRewards() external onlyOwner
+    {
+        require(_isActive == 1, "Contract already inactive");
+        _isActive = 0;
+        _timeFinished = block.timestamp;
+    }
+
+    /**
+     * @dev Enables staking
+     */
+    function enableStaking() external onlyOwner
+    {
+        require(_isActive == 0, "Staking already active");
+        _isActive = 1;
+    }
+
     // ===== TESTING FUNCTIONS ===== //
     // TO BE DELETED //
 
