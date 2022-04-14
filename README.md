@@ -6,6 +6,10 @@ This contract enables staking for VentiSwap token. It gives set reward rates per
 3 month lockup = 2% of stake / month  
 6 month lockup = 3% of stake / month
 
+NOTES:
+- This contract has set reward rates. It must be funded with an appropriate amount of reward tokens or claims will fail.
+- This contract assumes that staking token will be the same as reward token.
+
 ## User Functions
 
 ### View functions
