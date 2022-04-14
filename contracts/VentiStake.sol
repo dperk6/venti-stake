@@ -242,6 +242,7 @@ contract VentiStake is Ownable {
         // Check if staking is active
         require(_isActive != 0, "Staking inactive");
         require(_timeFinished == 0, "Staking finished"); // Should never get here, as _isActive should be set to false.
+        require(lock > 0 && lock < 4, "Lock must be 1, 2, or 3");
 
         // Transfer token
         stakingToken.transferFrom(msg.sender, address(this), amount);
