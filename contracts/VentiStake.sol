@@ -2,15 +2,12 @@
 
 pragma solidity 0.8.13;
 
-import "hardhat/console.sol";
 import "./libraries/Math.sol";
-import "./libraries/SafeMath.sol";
 import "./libraries/Ownable.sol";
 import "./libraries/SafeERC20.sol";
 import "./interfaces/IERC20.sol";
 
 contract VentiStake is Ownable {
-    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     IERC20 public stakingToken; // Staking token
@@ -30,7 +27,9 @@ contract VentiStake is Ownable {
         uint256 staked;
     }
 
-    constructor() {}
+    constructor(IERC20 stakingToken_) {
+        stakingToken = stakingToken_;
+    }
 
     // ===== VIEW FUNCTIONS ===== //
 
@@ -53,7 +52,7 @@ contract VentiStake is Ownable {
      */
     function totalRewards() external view returns (uint256)
     {
-        return stakingToken.balanceOf(address(this)).sub(_totalSupply);
+        return stakingToken.balanceOf(address(this)) - _totalSupply;
     }
 
     /**
@@ -77,7 +76,7 @@ contract VentiStake is Ownable {
      *
      * @return staked the total amount staked from account.
      */
-    function depositOf(address account) external view returns (uint256)
+    function balanceOf(address account) external view returns (uint256)
     {
         return _deposits[account].staked;
     }
@@ -141,16 +140,12 @@ contract VentiStake is Ownable {
         UserDeposit memory userDeposit = _deposits[account];
 
         // Calculate total time, months, and time delta between
-        uint256 timePassed = block.timestamp.sub(userDeposit.timestamp);
+        uint256 timePassed = block.timestamp - userDeposit.timestamp;
         uint256 monthsPassed = Math.floorDiv(timePassed, 2628000);
-        uint256 interimTime = timePassed.sub(monthsPassed.mul(2628000));
+        uint256 interimTime = timePassed - (monthsPassed * 2628000);
 
         // Calculate pending rewards based on prorated time from the current month
-        uint256 pending = uint256(userDeposit.staked)
-            .mul(
-                _baseMultiplier
-                .mul(uint256(userDeposit.lock))
-            ).div(1e18).mul(interimTime).div(2628000);
+        uint256 pending = userDeposit.staked * (_baseMultiplier * uint256(userDeposit.lock)) / 1e18 * interimTime / 2628000;
 
         return pending;
     }
@@ -179,18 +174,13 @@ contract VentiStake is Ownable {
 
         // If a final timestamp is set, use that instead of current timestamp
         uint256 endTime = _timeFinished == 0 ? block.timestamp : _timeFinished;
-        uint256 monthsPassed = Math.floorDiv(endTime.sub(userDeposit.timestamp), 2628000);
+        uint256 monthsPassed = Math.floorDiv(endTime - userDeposit.timestamp, 2628000);
 
         // If no months have passed, return 0
         if (monthsPassed == 0) return 0;
 
         // Calculate total earned - amount already paid
-        uint256 totalReward = userDeposit.staked
-            .mul(
-                _baseMultiplier
-                .mul(uint256(userDeposit.lock)
-            ).mul(monthsPassed)
-            ).div(1e18).sub(rewardPaid);
+        uint256 totalReward = userDeposit.staked * ((_baseMultiplier * uint256(userDeposit.lock)) * monthsPassed) / 1e18 - rewardPaid;
 
         return totalReward;
     }
@@ -258,20 +248,22 @@ contract VentiStake is Ownable {
 
         // Get current stake; add new amount to total supply
         uint256 currentStake = _deposits[msg.sender].staked;
-        _totalSupply = _totalSupply.add(amount);
+        _totalSupply += amount;
 
-        // If user's current stake is greater than 0, we need
-        // to get earned and pending rewards and add them to stake
+        // If user's current stake is greater than 0, we need to get
+        // earned and pending rewards and add them to stake and total
         if (currentStake > 0) {
-            currentStake = currentStake.add(earned(msg.sender));
-            currentStake = currentStake.add(pendingReward(msg.sender));
+            uint256 earnedAmount = earned(msg.sender);
+            uint256 pendingAmount = pendingReward(msg.sender);
+            _totalSupply += earnedAmount + pendingAmount;
+            currentStake += earnedAmount + pendingAmount;
         }
 
         // Create new deposit record for user with new lock time
         _deposits[msg.sender] = UserDeposit({
             lock: lock,
             timestamp: uint64(block.timestamp),
-            staked: amount.add(currentStake)
+            staked: amount + currentStake
         });
     }
 
@@ -297,10 +289,10 @@ contract VentiStake is Ownable {
         uint256 rewardPaid = _userRewardPaid[msg.sender];
 
         // Calculate amount to withdraw
-        uint256 amountToWithdraw = amount.add(earnedRewards);
+        uint256 amountToWithdraw = amount + earnedRewards;
 
         // Check if user is withdrawing their total stake
-        if (userDeposit.staked.sub(amount) == 0) {
+        if (userDeposit.staked - amount == 0) {
             // If withdrawing full amount we no longer care about paid rewards
             _userRewardPaid[msg.sender] = 0;
 
@@ -311,17 +303,17 @@ contract VentiStake is Ownable {
             });
         } else {
             // We track amount of rewards paid for current stakers to subtract from earnings
-            _userRewardPaid[msg.sender] = rewardPaid.add(earnedRewards);
+            _userRewardPaid[msg.sender] = rewardPaid + earnedRewards;
 
             _deposits[msg.sender] = UserDeposit({
                 lock: userDeposit.lock,
                 timestamp: userDeposit.timestamp,
-                staked: userDeposit.staked.sub(amount)
+                staked: userDeposit.staked - amount
             });
         }
 
         // Update total staked amount
-        _totalSupply = _totalSupply.sub(amount);
+        _totalSupply = _totalSupply - amount;
 
         // Transfer tokens to user
         stakingToken.safeTransfer(msg.sender, amountToWithdraw);
@@ -338,9 +330,23 @@ contract VentiStake is Ownable {
         require(amountToWithdraw > 0, "No rewards to withdraw");
 
         // Add amount to user's withdraw rewards
-        _userRewardPaid[msg.sender] = _userRewardPaid[msg.sender].add(amountToWithdraw);
+        _userRewardPaid[msg.sender] = _userRewardPaid[msg.sender] + amountToWithdraw;
 
+        stakingToken.transfer(msg.sender, amountToWithdraw);
+    }
 
+    /**
+     * @dev Funds rewards for contract
+     *
+     * @param amount the amount of tokens to fund
+     */
+    function fundStaking(uint256 amount) external onlyOwner
+    {
+        require(amount > 0, "Amount cannot be 0");
+
+        _totalRewards = _totalRewards + amount;
+
+        stakingToken.transferFrom(msg.sender, address(this), amount);
     }
 
     /**
@@ -380,36 +386,5 @@ contract VentiStake is Ownable {
     {
         require(_isActive == 0, "Staking already active");
         _isActive = 1;
-    }
-
-    // ===== TESTING FUNCTIONS ===== //
-    // TO BE DELETED //
-
-    function test(uint256 testVal1, uint256 testVal2) external view
-    {
-        uint256 rewardPaid = 0;
-        uint256 timePassed = block.timestamp.sub(testVal1);
-        uint256 monthsPassed = Math.floorDiv(timePassed, 2628000);
-        uint256 interimTime = timePassed.sub(monthsPassed.mul(2628000));
-
-        console.log(interimTime);
-
-        uint256 pending = uint256(testVal2)
-            .mul(
-                _baseMultiplier
-                .mul(uint256(3))
-            ).div(1e18).mul(interimTime).div(2628000);
-
-        console.log(pending);
-
-        uint256 monthlyReward = uint256(testVal2)
-            .mul(
-                _baseMultiplier
-                .mul(uint256(3)
-            ).mul(monthsPassed)
-            ).div(10000).sub(rewardPaid);
-
-        console.log(monthlyReward);
-        console.log(monthsPassed);
     }
 }
