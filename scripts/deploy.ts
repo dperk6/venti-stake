@@ -15,11 +15,11 @@ async function main() {
 
   // We get the contract to deploy
   const Stake = await ethers.getContractFactory("VentiStake");
-  const stake = await Stake.deploy();
+  
+  // Fill in correct token address for prod deploy
+  const stake = await Stake.deploy('0x');
 
   await stake.deployed();
-
-  await stake.test(1618238771, ethers.utils.parseEther('1.0'));
 
   console.log("Contract deployed to:", stake.address);
 }
