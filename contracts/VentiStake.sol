@@ -7,6 +7,7 @@ import "./libraries/Ownable.sol";
 import "./libraries/SafeERC20.sol";
 import "./interfaces/IERC20.sol";
 
+// solhint-disable not-rely-on-time
 contract VentiStake is Ownable {
     using SafeERC20 for IERC20;
 
