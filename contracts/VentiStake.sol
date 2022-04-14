@@ -266,6 +266,8 @@ contract VentiStake is Ownable {
             timestamp: uint64(block.timestamp),
             staked: amount + currentStake
         });
+
+        emit Deposited(msg.sender, amount);
     }
 
     /**
@@ -318,6 +320,8 @@ contract VentiStake is Ownable {
 
         // Transfer tokens to user
         stakingToken.safeTransfer(msg.sender, amountToWithdraw);
+
+        emit Withdrawal(msg.sender, amount);
     }
 
     /**
@@ -334,6 +338,8 @@ contract VentiStake is Ownable {
         _userRewardPaid[msg.sender] = _userRewardPaid[msg.sender] + amountToWithdraw;
 
         stakingToken.transfer(msg.sender, amountToWithdraw);
+
+        emit RewardsClaimed(amountToWithdraw);
     }
 
     /**
@@ -348,23 +354,8 @@ contract VentiStake is Ownable {
         _totalRewards = _totalRewards + amount;
 
         stakingToken.transferFrom(msg.sender, address(this), amount);
-    }
 
-    /**
-     * @dev Updates the base multiplier
-     *
-     * @param newMultiplier the updated reward multiplier
-     *
-     * @notice There is currently no means of tracking previous changes.
-     * This will impact all pending rewards and unclaimed earnings.
-     * Update TBD.
-     */
-    function updateMultiplier(uint256 newMultiplier) external onlyOwner
-    {
-        require(newMultiplier != 0, "Multiplier cannot be 0");
-        require(newMultiplier < 33e16, "Multiplier must be lower than 33e15");
-
-        _baseMultiplier = newMultiplier;
+        emit StakingFunded(amount);
     }
 
     /**
@@ -378,6 +369,8 @@ contract VentiStake is Ownable {
         require(_isActive == 1, "Contract already inactive");
         _isActive = 0;
         _timeFinished = block.timestamp;
+        
+        emit StakingEnded(block.timestamp);
     }
 
     /**
@@ -387,5 +380,16 @@ contract VentiStake is Ownable {
     {
         require(_isActive == 0, "Staking already active");
         _isActive = 1;
+
+        emit StakingEnabled();
     }
+
+    // ===== EVENTS ===== //
+
+    event StakingFunded(uint256 amount);
+    event StakingEnabled();
+    event StakingEnded(uint256 timestamp);
+    event RewardsClaimed(uint256 amount);
+    event Deposited(address indexed account, uint256 amount);
+    event Withdrawal(address indexed account, uint256 amount);
 }
