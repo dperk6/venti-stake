@@ -18,6 +18,7 @@ contract VentiStake is Ownable {
     uint256 private _baseMultiplier = 1e16; // 1e18 = 100%; 1e16 = 1%
     uint256 private _isActive = 0; // 0 = false, 1 = true
     uint256 private _timeFinished; // Set completed timestamp so we know when rewards ended
+    uint256 private _reentrant;
 
     mapping (address => UserDeposit) private _deposits; // Track all user deposits
     mapping (address => uint256) private _userRewardPaid; // Track all user withdrawals
@@ -30,6 +31,19 @@ contract VentiStake is Ownable {
 
     constructor(IERC20 stakingToken_) {
         stakingToken = stakingToken_;
+    }
+
+    // ===== MODIFIERS ===== //
+
+    /**
+     * @dev Reentrancy protection
+     */
+    modifier nonReentrant()
+    {
+        require(_reentrant == 0, "Reentrancy not allowed");
+        _reentrant = 1;
+        _;
+        _reentrant = 0;
     }
 
     // ===== VIEW FUNCTIONS ===== //
@@ -238,7 +252,7 @@ contract VentiStake is Ownable {
      * @param amount the amount of tokens to stake
      * @param lock the lock multiplier (1 = 1 month, 2 = 3 month, 3 = 6 month).
      */
-    function deposit(uint256 amount, uint8 lock) external
+    function deposit(uint256 amount, uint8 lock) external nonReentrant
     {
         // Check if staking is active
         require(_isActive != 0, "Staking inactive");
@@ -278,7 +292,7 @@ contract VentiStake is Ownable {
      *
      * @notice must be past unlock time.
      */
-    function withdraw(uint256 amount) external
+    function withdraw(uint256 amount) external nonReentrant
     {
         // Get user deposit info
         UserDeposit memory userDeposit = _deposits[msg.sender];
@@ -328,7 +342,7 @@ contract VentiStake is Ownable {
     /**
      * @dev Claims earned rewards.
      */
-    function claimRewards() external
+    function claimRewards() external nonReentrant
     {
         // Get user's earned rewards
         uint256 amountToWithdraw = earned(msg.sender);
