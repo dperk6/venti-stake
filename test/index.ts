@@ -40,7 +40,9 @@ describe("VentiStake", function () {
     await ethers.provider.send('evm_mine', []);
 
     const totalStaked = await ventiStake.totalSupply().then((res: BigNumber) => ethers.utils.formatEther(res.toString()));
-    expect(Number(totalStaked)).to.equal(Number(4000));
+    const totalRewards = await ventiStake.totalRewards().then((res: BigNumber) => res);
+    expect(Number(totalStaked)).to.equal(4000);
+    expect(Number(ethers.utils.formatEther(totalRewards.toString()))).to.equal(10000000);
 
     // Should not be withdrawable yet
     expect(await ventiStake.withdrawable(signers[1].address)).to.equal(false);
@@ -58,6 +60,8 @@ describe("VentiStake", function () {
     await ventiStake.connect(signers[4]).deposit(ethers.utils.parseEther('1000'), 1);
 
     const signer4Staked = Number(await ventiStake.balanceOf(signers[4].address).then((res: BigNumber) => ethers.utils.formatEther(res.toString())));
+    
+    expect(totalRewards.sub(await ventiStake.getClaimedAmount(signers[4].address))).to.equal(await ventiStake.totalRewards());
 
     // Signer 4's stake should equal to total amount staked (2000) and include both pending and earned rewards
     expect(signer4Staked).to.greaterThan(2000 + signer4Pending + signer4Earned);
@@ -144,5 +148,26 @@ describe("VentiStake", function () {
 
     // Should be no stakes left in contract
     expect(Number(ethers.utils.formatEther(await ventiStake.totalSupply()))).to.equal(0);
+
+    // Get owner balance
+    const ownerBalance = await ethers.provider.getBalance(signers[0].address).then((res: BigNumber) => ethers.utils.formatEther(res.toString()));
+
+    await signers[5].sendTransaction({
+      to: ventiStake.address,
+      value: ethers.utils.parseEther('1.0')
+    });
+
+    // Get updated owner balance
+    const newOwnerBalance = await ethers.provider.getBalance(signers[0].address).then((res: BigNumber) => ethers.utils.formatEther(res.toString()));
+
+    // Ensure fallback functions are working so any ETH
+    // sent to contract is sent to owner address
+    expect(Number(ownerBalance) + 1).to.equal(Number(newOwnerBalance));
+
+    // Ensure owner can withdraw leftover reward tokens
+    const ownerTokenBalance = await token.balanceOf(signers[0].address);
+    const totalRewardsInContract = await ventiStake.totalRewards();
+    await ventiStake.connect(signers[0]).withdrawRewardTokens();
+    expect(await token.balanceOf(signers[0].address)).to.equal(ownerTokenBalance.add(totalRewardsInContract));
   });
 });
