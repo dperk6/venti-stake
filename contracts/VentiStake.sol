@@ -7,7 +7,7 @@ import "./libraries/Ownable.sol";
 import "./libraries/SafeERC20.sol";
 import "./interfaces/IERC20.sol";
 
-// solhint-disable not-rely-on-time
+// solhint-disable not-rely-on-time, avoid-low-level-calls
 contract VentiStake is Ownable {
     using SafeERC20 for IERC20;
 
@@ -15,14 +15,27 @@ contract VentiStake is Ownable {
 
     uint256 private _totalSupply; // Total staked amount
     uint256 private _totalRewards;  // Total amount for rewards
-    uint256 private _baseMultiplier = 1e16; // 1e18 = 100%; 1e16 = 1%
-    uint256 private _isActive = 0; // 0 = false, 1 = true
-    uint256 private _timeFinished; // Set completed timestamp so we know when rewards ended
-    uint256 private _reentrant;
+
+    // Set standard contract data in ContractData struct
+    ContractData private _data = ContractData({
+        isActive: 0,
+        reentrant: 1,
+        timeFinished: 0,
+        baseMultiplier: 1e16
+    });
 
     mapping (address => UserDeposit) private _deposits; // Track all user deposits
     mapping (address => uint256) private _userRewardPaid; // Track all user withdrawals
 
+    // Store global contract data in packed struct
+    struct ContractData {
+        uint8 isActive;
+        uint8 reentrant;
+        uint64 timeFinished;
+        uint64 baseMultiplier;
+    }
+
+    // Store user deposit data in packed struct
     struct UserDeposit {
         uint8 lock; // 1 = 1 month; 2 = 3 month; 3 = 6 month
         uint64 timestamp;
@@ -40,10 +53,20 @@ contract VentiStake is Ownable {
      */
     modifier nonReentrant()
     {
-        require(_reentrant == 0, "Reentrancy not allowed");
-        _reentrant = 1;
+        require(_data.reentrant == 1, "Reentrancy not allowed");
+        _data.reentrant = 2;
         _;
-        _reentrant = 0;
+        _data.reentrant = 1;
+    }
+
+    // ===== PAYABLE DEFAULTS ====== //
+
+    fallback() external payable {
+        owner().call{value: msg.value}("");
+    }
+
+    receive() external payable {
+        owner().call{value: msg.value}("");
     }
 
     // ===== VIEW FUNCTIONS ===== //
@@ -67,7 +90,7 @@ contract VentiStake is Ownable {
      */
     function totalRewards() external view returns (uint256)
     {
-        return stakingToken.balanceOf(address(this)) - _totalSupply;
+        return _totalRewards;
     }
 
     /**
@@ -81,7 +104,7 @@ contract VentiStake is Ownable {
      */
     function baseMultiplier() external view returns (uint256)
     {
-        return _baseMultiplier;
+        return _data.baseMultiplier;
     }
 
     /**
@@ -109,6 +132,20 @@ contract VentiStake is Ownable {
     }
 
     /**
+     * @dev Checks total claimed rewards for account
+     *
+     * @param account the user account to look up
+     *
+     * @return claimed the total claimed amount
+     *
+     * @notice This resets to 0 when a user fully withdraws their stake
+     */
+    function getClaimedAmount(address account) external view returns (uint256)
+    {
+        return _userRewardPaid[account];
+    }
+
+    /**
      * @dev Checks if staking contract is active.
      *
      * @notice _isActive is stored as uint where 0 = false; 1 = true.
@@ -117,7 +154,7 @@ contract VentiStake is Ownable {
      */
     function isActive() external view returns (bool)
     {
-        return _isActive == 1;
+        return _data.isActive == 1;
     }
 
     /**
@@ -129,7 +166,7 @@ contract VentiStake is Ownable {
      */
     function timeEnded() external view returns (uint256)
     {
-        return _timeFinished;
+        return _data.timeFinished;
     }
 
     /**
@@ -147,7 +184,7 @@ contract VentiStake is Ownable {
     function pendingReward(address account) public view returns (uint256)
     {
         // If staking rewards are finished, should always return 0
-        if (_timeFinished > 0) {
+        if (_data.timeFinished > 0) {
             return 0;
         }
 
@@ -160,7 +197,7 @@ contract VentiStake is Ownable {
         uint256 interimTime = timePassed - (monthsPassed * 2628000);
 
         // Calculate pending rewards based on prorated time from the current month
-        uint256 pending = userDeposit.staked * (_baseMultiplier * uint256(userDeposit.lock)) / 1e18 * interimTime / 2628000;
+        uint256 pending = userDeposit.staked * (_data.baseMultiplier * uint256(userDeposit.lock)) / 1e18 * interimTime / 2628000;
 
         return pending;
     }
@@ -188,14 +225,14 @@ contract VentiStake is Ownable {
         uint256 rewardPaid = _userRewardPaid[account];
 
         // If a final timestamp is set, use that instead of current timestamp
-        uint256 endTime = _timeFinished == 0 ? block.timestamp : _timeFinished;
+        uint256 endTime = _data.timeFinished == 0 ? block.timestamp : _data.timeFinished;
         uint256 monthsPassed = Math.floorDiv(endTime - userDeposit.timestamp, 2628000);
 
         // If no months have passed, return 0
         if (monthsPassed == 0) return 0;
 
         // Calculate total earned - amount already paid
-        uint256 totalReward = userDeposit.staked * ((_baseMultiplier * uint256(userDeposit.lock)) * monthsPassed) / 1e18 - rewardPaid;
+        uint256 totalReward = userDeposit.staked * ((_data.baseMultiplier * uint256(userDeposit.lock)) * monthsPassed) / 1e18 - rewardPaid;
 
         return totalReward;
     }
@@ -251,36 +288,50 @@ contract VentiStake is Ownable {
      *
      * @param amount the amount of tokens to stake
      * @param lock the lock multiplier (1 = 1 month, 2 = 3 month, 3 = 6 month).
+     *
+     * @notice Users cannot change lock periods if adding additional stake
      */
-    function deposit(uint256 amount, uint8 lock) external nonReentrant
+    function deposit(uint256 amount, uint8 lock) external payable nonReentrant
     {
         // Check if staking is active
-        require(_isActive != 0, "Staking inactive");
-        require(_timeFinished == 0, "Staking finished"); // Should never get here, as _isActive should be set to false.
+        require(_data.isActive != 0, "Staking inactive");
         require(lock > 0 && lock < 4, "Lock must be 1, 2, or 3");
+        require(amount > 0, "Amount cannot be 0");
+
+        // Get existing user deposit. All 0s if non-existent
+        UserDeposit storage userDeposit = _deposits[msg.sender];
 
         // Transfer token
         stakingToken.transferFrom(msg.sender, address(this), amount);
 
-        // Get current stake; add new amount to total supply
-        uint256 currentStake = _deposits[msg.sender].staked;
-        _totalSupply += amount;
-
         // If user's current stake is greater than 0, we need to get
         // earned and pending rewards and add them to stake and total
-        if (currentStake > 0) {
+        if (userDeposit.staked > 0) {
             uint256 earnedAmount = earned(msg.sender);
             uint256 pendingAmount = pendingReward(msg.sender);
-            _totalSupply += earnedAmount + pendingAmount;
-            currentStake += earnedAmount + pendingAmount;
-        }
+            uint256 combinedAmount = earnedAmount + pendingAmount;
 
-        // Create new deposit record for user with new lock time
-        _deposits[msg.sender] = UserDeposit({
-            lock: lock,
-            timestamp: uint64(block.timestamp),
-            staked: amount + currentStake
-        });
+            // Update user's claimed amount
+            _userRewardPaid[msg.sender] += combinedAmount;
+
+            // Update total rewards by subtracting earned/pending amounts
+            _totalRewards -= combinedAmount;
+
+            // Update total supply and current stake
+            _totalSupply += amount + combinedAmount;
+
+            // Save new deposit data
+            userDeposit.staked += amount + combinedAmount;
+            userDeposit.timestamp = uint64(block.timestamp);
+        } else {
+            // Create new deposit record for user with new lock time
+            userDeposit.lock = lock;
+            userDeposit.timestamp = uint64(block.timestamp);
+            userDeposit.staked = amount;
+
+            // Add new amount to total supply
+            _totalSupply += amount;
+        }
 
         emit Deposited(msg.sender, amount);
     }
@@ -292,10 +343,10 @@ contract VentiStake is Ownable {
      *
      * @notice must be past unlock time.
      */
-    function withdraw(uint256 amount) external nonReentrant
+    function withdraw(uint256 amount) external payable nonReentrant
     {
-        // Get user deposit info
-        UserDeposit memory userDeposit = _deposits[msg.sender];
+        // Get user deposit info in storage
+        UserDeposit storage userDeposit = _deposits[msg.sender];
 
         // Check if user can withdraw amount
         require(userDeposit.staked > 0, "User has no stake");
@@ -304,34 +355,27 @@ contract VentiStake is Ownable {
 
         // Get earned rewards and paid rewards
         uint256 earnedRewards = earned(msg.sender);
-        uint256 rewardPaid = _userRewardPaid[msg.sender];
 
         // Calculate amount to withdraw
         uint256 amountToWithdraw = amount + earnedRewards;
 
         // Check if user is withdrawing their total stake
-        if (userDeposit.staked - amount == 0) {
+        if (userDeposit.staked == amount) {
             // If withdrawing full amount we no longer care about paid rewards
             _userRewardPaid[msg.sender] = 0;
-
-            _deposits[msg.sender] = UserDeposit({
-                lock: 0,
-                timestamp: 0,
-                staked: 0
-            });
+            // We only need to set staked to 0 because it is the only
+            // value checked on future deposits
+            userDeposit.staked = 0;
         } else {
             // We track amount of rewards paid for current stakers to subtract from earnings
-            _userRewardPaid[msg.sender] = rewardPaid + earnedRewards;
+            _userRewardPaid[msg.sender] += earnedRewards;
 
-            _deposits[msg.sender] = UserDeposit({
-                lock: userDeposit.lock,
-                timestamp: userDeposit.timestamp,
-                staked: userDeposit.staked - amount
-            });
+            userDeposit.staked -= amount;
         }
 
-        // Update total staked amount
-        _totalSupply = _totalSupply - amount;
+        // Update total staked amount and rewards amount
+        _totalSupply -= amount;
+        _totalRewards -= earnedRewards;
 
         // Transfer tokens to user
         stakingToken.safeTransfer(msg.sender, amountToWithdraw);
@@ -340,19 +384,53 @@ contract VentiStake is Ownable {
     }
 
     /**
+     * @dev Emergency withdrawal in case rewards have been pulled
+     *
+     * @notice Only available after staking is closed and
+     * all reward tokens have been withdrawn.
+     */
+    function emergencyWithdrawal() external payable
+    {
+        require(_data.isActive == 0, "Staking must be closed");
+        require(_data.timeFinished > 0, "Staking must be closed");
+        require(_totalRewards == 0, "Use normal withdraw");
+
+        // Get user deposit info
+        // UserDeposit memory userDeposit = _deposits[msg.sender];
+        uint256 amountToWithdraw = _deposits[msg.sender].staked;
+        require(amountToWithdraw > 0, "No stake to withdraw");
+
+        // Reset all data
+        _userRewardPaid[msg.sender] = 0;
+        _deposits[msg.sender].staked = 0;
+
+        // Update total staked amount
+        _totalSupply -= amountToWithdraw;
+
+        // Transfer tokens to user
+        stakingToken.safeTransfer(msg.sender, amountToWithdraw);
+
+        emit Withdrawal(msg.sender, amountToWithdraw);
+    }
+
+    /**
      * @dev Claims earned rewards.
      */
-    function claimRewards() external nonReentrant
+    function claimRewards() external payable nonReentrant
     {
         // Get user's earned rewards
         uint256 amountToWithdraw = earned(msg.sender);
         
         require(amountToWithdraw > 0, "No rewards to withdraw");
+        require(amountToWithdraw <= _totalRewards, "Not enough rewards in contract");
 
         // Add amount to user's withdraw rewards
-        _userRewardPaid[msg.sender] = _userRewardPaid[msg.sender] + amountToWithdraw;
+        _userRewardPaid[msg.sender] += amountToWithdraw;
 
-        stakingToken.transfer(msg.sender, amountToWithdraw);
+        // Update total rewards
+        _totalRewards -= amountToWithdraw;
+
+        stakingToken.safeTransfer(msg.sender, amountToWithdraw);
 
         emit RewardsClaimed(amountToWithdraw);
     }
@@ -362,15 +440,32 @@ contract VentiStake is Ownable {
      *
      * @param amount the amount of tokens to fund
      */
-    function fundStaking(uint256 amount) external onlyOwner
+    function fundStaking(uint256 amount) external payable onlyOwner
     {
         require(amount > 0, "Amount cannot be 0");
 
-        _totalRewards = _totalRewards + amount;
+        _totalRewards += amount;
 
-        stakingToken.transferFrom(msg.sender, address(this), amount);
+        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
 
         emit StakingFunded(amount);
+    }
+
+    /**
+     * @dev Withdraws rewards tokens
+     *
+     * @notice Requires rewards to be closed. This
+     * function is intended to pull leftover tokens
+     * once all users have claimed rewards.
+     */
+    function withdrawRewardTokens() external payable onlyOwner
+    {
+        require(_data.timeFinished > 0, "Staking must be complete");
+
+        uint256 amountToWithdraw = _totalRewards;
+        _totalRewards = 0;
+
+        stakingToken.safeTransfer(owner(), amountToWithdraw);
     }
 
     /**
@@ -379,11 +474,11 @@ contract VentiStake is Ownable {
      * @notice This is a one-way function. Once staking is closed, it
      * cannot be re-enabled. Use cautiously.
      */
-    function closeRewards() external onlyOwner
+    function closeRewards() external payable onlyOwner
     {
-        require(_isActive == 1, "Contract already inactive");
-        _isActive = 0;
-        _timeFinished = block.timestamp;
+        require(_data.isActive == 1, "Contract already inactive");
+        _data.isActive = 0;
+        _data.timeFinished = uint64(block.timestamp);
         
         emit StakingEnded(block.timestamp);
     }
@@ -391,10 +486,10 @@ contract VentiStake is Ownable {
     /**
      * @dev Enables staking
      */
-    function enableStaking() external onlyOwner
+    function enableStaking() external payable onlyOwner
     {
-        require(_isActive == 0, "Staking already active");
-        _isActive = 1;
+        require(_data.isActive == 0, "Staking already active");
+        _data.isActive = 1;
 
         emit StakingEnabled();
     }
