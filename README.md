@@ -27,7 +27,8 @@ NOTES:
 **getDeposit** -> takes address as param and returns all staking info (lock multiplier, timestamp, and staked amount)
 
 **isActive** -> returns boolean showing if staking is active
-timeEnded -> returns timestamp when staking finished (0 if active)
+
+**timeEnded** -> returns timestamp when staking finished (0 if active)
 
 **pendingReward** -> takes account as param and returns pending amount prorated based on time (not yet claimable)
 
@@ -39,7 +40,9 @@ timeEnded -> returns timestamp when staking finished (0 if active)
 
 **deposit** -> takes amount and lock period. NOTE: Lock 1 = 1 month, Lock 2 = 3 months, Lock 3 = 6 months.
 
-**withdraw** -> takes amount as param and withdraws stake and claims all earned rewards
+**withdraw** -> takes amount as param and withdraws stake and claims all earned rewards.
+
+**emergencyWithdraw** -> basic withdrawals claim rewards in one tx. If reward tokens have been removed, users can use this function to withdraw their tokens separately of their
 
 **claimRewards** -> claims all earned rewards for sender
 
@@ -50,3 +53,5 @@ timeEnded -> returns timestamp when staking finished (0 if active)
 **closeRewards** -> marks staking as inactive and locks timestamp as the end of rewards
 
 **enableStaking** -> marks staking as active and allows deposits
+
+**withdrawRewardTokens** -> pulls reward tokens from contract after staking is complete. NOTE: this should only be called _after_ users have had enough time to withdraw their reward tokens. Since staked tokens and available rewards are tracked separately, contract owners _do not_ have the ability to withdraw user stakes.
