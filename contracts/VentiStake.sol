@@ -218,7 +218,7 @@ contract VentiStake is Ownable {
         if (monthsPassed == 0) return 0;
 
         // Calculate total earned - amount already paid
-        uint256 totalReward = userDeposit.staked * ((_data.baseMultiplier * uint256(userDeposit.lock)) * monthsPassed) / 1e18 - rewardPaid;
+        uint256 totalReward = userDeposit.staked * ((_data.baseMultiplier * userDeposit.lock) * monthsPassed) / 1e18 - rewardPaid;
 
         return totalReward;
     }
@@ -363,13 +363,12 @@ contract VentiStake is Ownable {
             }
             // Remove amount from staked
             userDeposit.staked -= amount;
+            // Start fresh
+            _userRewardPaid[msg.sender] = 0;
             // Set new timestamp to 1, 3, or 6 months prior so users can still withdraw
             // from original stake time but rewards essentially restart
-            userDeposit.timestamp = uint64(block.timestamp - (2627999 * monthsForStaking));
-            uint256 simulatedRewards = pendingReward(msg.sender) + earned(msg.sender);
-
-            // Set rewards paid to the simulated amount so users don't get double rewards
-            _userRewardPaid[msg.sender] = simulatedRewards;
+            userDeposit.timestamp = uint64(block.timestamp - (2628001 * monthsForStaking));
+            _userRewardPaid[msg.sender] = earned(msg.sender);
         }
 
         // Update total staked amount and rewards amount
