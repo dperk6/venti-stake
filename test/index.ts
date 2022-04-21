@@ -178,37 +178,58 @@ describe("VentiStake", function () {
     expect(await token.balanceOf(signers[0].address)).to.equal(ownerTokenBalance.add(totalRewardsInContract));
   });
 
-  it("Should test the withdrawal pattern", async function() {
+  it("Should test partial withdrawals", async function() {
     await token.connect(signers[1]).approve(ventiStake.address, ethers.utils.parseEther('1000'));
-    await ventiStake.connect(signers[1]).deposit(ethers.utils.parseEther('1000'), 1);
+    await token.connect(signers[2]).approve(ventiStake.address, ethers.utils.parseEther('1000'));
+    await ventiStake.connect(signers[1]).deposit(ethers.utils.parseEther('1000'), 2);
+    await ventiStake.connect(signers[2]).deposit(ethers.utils.parseEther('1000'), 3);
 
-    // Increase by 2 months + 1 second
-    await ethers.provider.send("evm_increaseTime", [2628000 * 2 + 1]);
+    // Increase by 6 months
+    await ethers.provider.send("evm_increaseTime", [2628001 * 6]);
     await ethers.provider.send('evm_mine', []);
+    await ethers.provider.send('evm_setAutomine', [false]);
     
     // Check that token balance after withdrawing is withdrawn amount + earned rewards
-    const earnedRewards = await ventiStake.earned(signers[1].address);
-    const preBalance = await token.balanceOf(signers[1].address);
+    const earnedRewards1 = await ventiStake.earned(signers[1].address);
+    const earnedRewards2 = await ventiStake.earned(signers[2].address);
+    const preBalance1 = await token.balanceOf(signers[1].address);
+    const preBalance2 = await token.balanceOf(signers[2].address);
+
+    // Withdraw half and mine
     await ventiStake.connect(signers[1]).withdraw(ethers.utils.parseEther('500'));
-    const postBalance = await token.balanceOf(signers[1].address);
-    expect(postBalance.sub(preBalance)).to.equal(earnedRewards.add(BigNumber.from(ethers.utils.parseEther('500'))));
+    await ventiStake.connect(signers[2]).withdraw(ethers.utils.parseEther('500'));
+    await ethers.provider.send('evm_mine', []);
+
+    const postBalance1 = await token.balanceOf(signers[1].address);
+    const postBalance2 = await token.balanceOf(signers[2].address);
+
+    // Check withdraw occurred successfully
+    expect(postBalance1.sub(preBalance1)).to.equal(earnedRewards1.add(BigNumber.from(ethers.utils.parseEther('500'))));
+    expect(postBalance2.sub(preBalance2)).to.equal(earnedRewards2.add(BigNumber.from(ethers.utils.parseEther('500'))));
 
     // Verify that withdraw calculated successfully
     expect(await ventiStake.balanceOf(signers[1].address)).to.equal(BigNumber.from(ethers.utils.parseEther('500')));
+    expect(await ventiStake.balanceOf(signers[2].address)).to.equal(BigNumber.from(ethers.utils.parseEther('500')));
 
     // Verify that earned rewards are 0
     expect(await ventiStake.earned(signers[1].address)).to.equal(0);
+    expect(await ventiStake.earned(signers[2].address)).to.equal(0);
 
-    // Increase by 1 month + 1 second
-    await ethers.provider.send("evm_increaseTime", [2628002]);
+    // Increase by another month
+    await ethers.provider.send("evm_increaseTime", [2628001]);
     await ethers.provider.send('evm_mine', []);
     
-    // Check it's marginally greater than 1% to account for dust
-    expect(Number((ethers.utils.formatEther(await ventiStake.earned(signers[1].address))))).to.greaterThan(5);
-    expect(Number((ethers.utils.formatEther(await ventiStake.earned(signers[1].address))))).to.lessThan(5.001);
+    // Check it's 2% and 3% of outstanding amount (500) respectively
+    expect(Number((ethers.utils.formatEther(await ventiStake.earned(signers[1].address))))).to.equal(10);
+    expect(Number((ethers.utils.formatEther(await ventiStake.earned(signers[2].address))))).to.equal(15);
 
+    // Withdraw outstanding amounts and mine
     await ventiStake.connect(signers[1]).withdraw(await ventiStake.balanceOf(signers[1].address));
+    await ventiStake.connect(signers[2]).withdraw(await ventiStake.balanceOf(signers[2].address));
+    await ethers.provider.send('evm_mine', []);
 
+    // Should be no staked amount left in contract
     expect(await ventiStake.totalSupply()).to.equal(0);
+
   });
 });
