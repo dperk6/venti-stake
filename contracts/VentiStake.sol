@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.13;
 
+import "hardhat/console.sol";
 import "./libraries/Math.sol";
 import "./libraries/Ownable.sol";
 import "./libraries/SafeERC20.sol";
@@ -25,7 +26,8 @@ contract VentiStake is Ownable {
     });
 
     mapping (address => UserDeposit) private _deposits; // Track all user deposits
-    mapping (address => uint256) private _userRewardPaid; // Track all user withdrawals
+    mapping (address => uint256) private _userRewardPaid; // Track all user claims
+    mapping (address => uint256) private _withdrawn; // Track all user withdrawals
 
     // Store global contract data in packed struct
     struct ContractData {
@@ -129,20 +131,6 @@ contract VentiStake is Ownable {
     function getDeposit(address account) external view returns (UserDeposit memory)
     {
         return _deposits[account];
-    }
-
-    /**
-     * @dev Checks total claimed rewards for account
-     *
-     * @param account the user account to look up
-     *
-     * @return claimed the total claimed amount
-     *
-     * @notice This resets to 0 when a user fully withdraws their stake
-     */
-    function getClaimedAmount(address account) external view returns (uint256)
-    {
-        return _userRewardPaid[account];
     }
 
     /**
@@ -367,10 +355,23 @@ contract VentiStake is Ownable {
             // value checked on future deposits
             userDeposit.staked = 0;
         } else {
-            // We track amount of rewards paid for current stakers to subtract from earnings
-            _userRewardPaid[msg.sender] += earnedRewards;
-
+            uint256 monthsForStaking;
+            if (userDeposit.lock == 1) {
+                monthsForStaking = 1;
+            } else if (userDeposit.lock == 2) {
+                monthsForStaking = 3;
+            } else if (userDeposit.lock == 3) {
+                monthsForStaking = 6;
+            }
+            // Remove amount from staked
             userDeposit.staked -= amount;
+            // Set new timestamp to 1, 3, or 6 months prior so users can still withdraw
+            // from original stake time but rewards essentially restart
+            userDeposit.timestamp = uint64(block.timestamp - (2627999 * monthsForStaking));
+            uint256 simulatedRewards = pendingReward(msg.sender) + earned(msg.sender);
+
+            // Set rewards paid to the simulated amount so users don't get double rewards
+            _userRewardPaid[msg.sender] = simulatedRewards;
         }
 
         // Update total staked amount and rewards amount
