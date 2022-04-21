@@ -1,17 +1,23 @@
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
+import { TestToken, VentiStake } from "../typechain";
 
 describe("VentiStake", function () {
-  it("Allow staking, claiming, and withdraw for multiple users", async function () {
-    const signers = await ethers.getSigners();
+  let token: TestToken;
+  let signers: SignerWithAddress[];
+  let ventiStake: VentiStake;
 
+  beforeEach(async function () {
+    signers = await ethers.getSigners();
+    
     const VentiStake = await ethers.getContractFactory("VentiStake");
     const Token = await ethers.getContractFactory("TestToken");
-    const token = await Token.deploy("21000000000000000000000000");
+    token = await Token.deploy("21000000000000000000000000");
     await token.deployed();
 
-    const ventiStake = await VentiStake.deploy(token.address);
+    ventiStake = await VentiStake.deploy(token.address);
     await ventiStake.deployed();
 
     await token.connect(signers[0]).transfer(signers[1].address, ethers.utils.parseEther('1000'));
@@ -22,6 +28,9 @@ describe("VentiStake", function () {
     await token.connect(signers[0]).approve(ventiStake.address, ethers.utils.parseEther('9999999999999'));
     await ventiStake.connect(signers[0]).fundStaking(ethers.utils.parseEther('10000000'));
     await ventiStake.connect(signers[0]).enableStaking();
+  });
+
+  it("Allow staking, claiming, and withdraw for multiple users", async function () {
 
     expect(await ventiStake.isActive()).to.equal(true);
     expect(Number(ethers.utils.formatEther(await token.balanceOf(ventiStake.address)))).to.equal(10000000);
@@ -61,8 +70,6 @@ describe("VentiStake", function () {
 
     const signer4Staked = Number(await ventiStake.balanceOf(signers[4].address).then((res: BigNumber) => ethers.utils.formatEther(res.toString())));
     
-    expect(totalRewards.sub(await ventiStake.getClaimedAmount(signers[4].address))).to.equal(await ventiStake.totalRewards());
-
     // Signer 4's stake should equal to total amount staked (2000) and include both pending and earned rewards
     expect(signer4Staked).to.greaterThan(2000 + signer4Pending + signer4Earned);
     expect(signer4Staked).to.lessThan(2011);
@@ -169,5 +176,39 @@ describe("VentiStake", function () {
     const totalRewardsInContract = await ventiStake.totalRewards();
     await ventiStake.connect(signers[0]).withdrawRewardTokens();
     expect(await token.balanceOf(signers[0].address)).to.equal(ownerTokenBalance.add(totalRewardsInContract));
+  });
+
+  it("Should test the withdrawal pattern", async function() {
+    await token.connect(signers[1]).approve(ventiStake.address, ethers.utils.parseEther('1000'));
+    await ventiStake.connect(signers[1]).deposit(ethers.utils.parseEther('1000'), 1);
+
+    // Increase by 2 months + 1 second
+    await ethers.provider.send("evm_increaseTime", [2628000 * 2 + 1]);
+    await ethers.provider.send('evm_mine', []);
+    
+    // Check that token balance after withdrawing is withdrawn amount + earned rewards
+    const earnedRewards = await ventiStake.earned(signers[1].address);
+    const preBalance = await token.balanceOf(signers[1].address);
+    await ventiStake.connect(signers[1]).withdraw(ethers.utils.parseEther('500'));
+    const postBalance = await token.balanceOf(signers[1].address);
+    expect(postBalance.sub(preBalance)).to.equal(earnedRewards.add(BigNumber.from(ethers.utils.parseEther('500'))));
+
+    // Verify that withdraw calculated successfully
+    expect(await ventiStake.balanceOf(signers[1].address)).to.equal(BigNumber.from(ethers.utils.parseEther('500')));
+
+    // Verify that earned rewards are 0
+    expect(await ventiStake.earned(signers[1].address)).to.equal(0);
+
+    // Increase by 1 month + 1 second
+    await ethers.provider.send("evm_increaseTime", [2628002]);
+    await ethers.provider.send('evm_mine', []);
+    
+    // Check it's marginally greater than 1% to account for dust
+    expect(Number((ethers.utils.formatEther(await ventiStake.earned(signers[1].address))))).to.greaterThan(5);
+    expect(Number((ethers.utils.formatEther(await ventiStake.earned(signers[1].address))))).to.lessThan(5.001);
+
+    await ventiStake.connect(signers[1]).withdraw(await ventiStake.balanceOf(signers[1].address));
+
+    expect(await ventiStake.totalSupply()).to.equal(0);
   });
 });
