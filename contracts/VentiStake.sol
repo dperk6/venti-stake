@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.13;
 
-import "hardhat/console.sol";
 import "./libraries/Math.sol";
 import "./libraries/Ownable.sol";
 import "./libraries/SafeERC20.sol";
@@ -27,7 +26,6 @@ contract VentiStake is Ownable {
 
     mapping (address => UserDeposit) private _deposits; // Track all user deposits
     mapping (address => uint256) private _userRewardPaid; // Track all user claims
-    mapping (address => uint256) private _withdrawn; // Track all user withdrawals
 
     // Store global contract data in packed struct
     struct ContractData {
