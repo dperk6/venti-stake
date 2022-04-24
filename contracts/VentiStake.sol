@@ -397,7 +397,6 @@ contract VentiStake is Ownable {
         require(_totalRewards == 0, "Use normal withdraw");
 
         // Get user deposit info
-        // UserDeposit memory userDeposit = _deposits[msg.sender];
         uint256 amountToWithdraw = _deposits[msg.sender].staked;
         require(amountToWithdraw > 0, "No stake to withdraw");
 
