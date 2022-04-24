@@ -177,14 +177,17 @@ contract VentiStake is Ownable {
         // Get deposit record for account
         UserDeposit memory userDeposit = _deposits[account];
 
+        if (userDeposit.staked == 0) {
+            return 0;
+        }
+
         // Calculate total time, months, and time delta between
         uint256 timePassed = block.timestamp - userDeposit.timestamp;
-        uint256 monthsPassed = Math.floorDiv(timePassed, 2628000);
+        uint256 monthsPassed = timePassed > 0 ? Math.floorDiv(timePassed, 2628000) : 0;
         uint256 interimTime = timePassed - (monthsPassed * 2628000);
 
         // Calculate pending rewards based on prorated time from the current month
         uint256 pending = userDeposit.staked * (_data.baseMultiplier * uint256(userDeposit.lock)) / 1e18 * interimTime / 2628000;
-
         return pending;
     }
 
@@ -219,7 +222,7 @@ contract VentiStake is Ownable {
 
         // Calculate total earned - amount already paid
         uint256 totalReward = userDeposit.staked * ((_data.baseMultiplier * userDeposit.lock) * monthsPassed) / 1e18 - rewardPaid;
-
+        
         return totalReward;
     }
 
