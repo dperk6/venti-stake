@@ -12,7 +12,7 @@ describe("VentiStake", function () {
   beforeEach(async function () {
     signers = await ethers.getSigners();
     
-    const VentiStake = await ethers.getContractFactory("VentiStake");
+    const VentiStake = await ethers.getContractFactory("VentiStakeFull");
     const Token = await ethers.getContractFactory("TestToken");
     token = await Token.deploy("21000000000000000000000000");
     await token.deployed();
