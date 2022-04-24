@@ -47,6 +47,7 @@ library Math {
      * This divides two numbers and rounds down
      */
     function floorDiv(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a == 0) return 0;
         return a / b - (a % b == 0 ? 1 : 0);
     }
 }
