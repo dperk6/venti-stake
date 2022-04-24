@@ -47,7 +47,7 @@ HOW TO DEPLOY (Owner):
 
 ### Mutative functions
 
-**deposit** -> takes amount and lock period. NOTE: Lock 1 = 1 month, Lock 2 = 3 months, Lock 3 = 6 months.
+**deposit** -> takes amount and lock period. NOTE: Lock 1 = 1 month, Lock 2 = 3 months, Lock 3 = 6 months. Users can add additional deposits, however the lock will only be updated if either a) the new lock is greater than the old lock, or b) the lock time has passed. Staking timestamp is updated on each deposit.
 
 **withdraw** -> takes amount as param and withdraws stake and claims all earned rewards.
 
