@@ -10,6 +10,13 @@ NOTES:
 - This contract has set reward rates. It must be funded with an appropriate amount of reward tokens or claims will fail.
 - This contract assumes that staking token will be the same as reward token.
 
+HOW TO DEPLOY (Owner):  
+1. Deploy contract to mainnet (with token address as constructor argument).
+2. Approve token to be spent by the new contract address.
+3. Call fundStaking and pass amount of tokens to fund contract with. This will send tokens from caller to contract.
+4. Call enableStaking. This will mark staking as active and allow users to deposit.
+5. Keep an eye on amount staked and amount of rewards. Should call fundStaking and provide more rewards as they deplete.
+
 ## User Functions
 
 ### View functions
