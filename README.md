@@ -42,7 +42,7 @@ NOTES:
 
 **withdraw** -> takes amount as param and withdraws stake and claims all earned rewards.
 
-**emergencyWithdraw** -> basic withdrawals claim rewards in one tx. If reward tokens have been removed, users can use this function to withdraw their tokens separately of their
+**emergencyWithdraw** -> basic withdrawals claim rewards in one tx. If reward tokens have been removed, users can use this function to withdraw their tokens separately of their rewards.
 
 **claimRewards** -> claims all earned rewards for sender
 
