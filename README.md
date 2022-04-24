@@ -21,27 +21,29 @@ HOW TO DEPLOY (Owner):
 
 ### View functions
 
-**stakingToken** -> returns staking token address
+**stakingToken** -> returns staking token address.
 
-**totalSupply** -> returns total amount staked
+**totalSupply** -> returns total amount staked.
 
-**totalRewards** -> returns total amount of rewards in contract
+**totalRewards** -> returns total amount of rewards in contract.
 
-**baseMultiplier** -> returns 1 month multiplier normalized to 1e18 (100%)
+**baseMultiplier** -> returns 1 month multiplier normalized to 1e18 (100%).
 
-**balanceOf** -> takes address as param and returns account's staked amount
+**balanceOf** -> takes address as param and returns account's staked amount.
 
-**getDeposit** -> takes address as param and returns all staking info (lock multiplier, timestamp, and staked amount)
+**getDeposit** -> takes address as param and returns all staking info (lock multiplier, timestamp, and staked amount).
 
-**isActive** -> returns boolean showing if staking is active
+**isActive** -> returns boolean showing if staking is active.
 
-**timeEnded** -> returns timestamp when staking finished (0 if active)
+**getMinimumStake** -> returns current minimum stake. This minimum is updateable.
 
-**pendingReward** -> takes account as param and returns pending amount prorated based on time (not yet claimable)
+**timeEnded** -> returns timestamp when staking finished (0 if active).
 
-**earned** -> takes account as param and returns earned amount based on months passed (is claimable)
+**pendingReward** -> takes account as param and returns pending amount prorated based on time (not yet claimable).
 
-**withdrawable** -> takes account as param and returns boolean showing if user can withdraw their stake
+**earned** -> takes account as param and returns earned amount based on months passed (is claimable).
+
+**withdrawable** -> takes account as param and returns boolean showing if user can withdraw their stake.
 
 ### Mutative functions
 
@@ -51,14 +53,16 @@ HOW TO DEPLOY (Owner):
 
 **emergencyWithdraw** -> basic withdrawals claim rewards in one tx. If reward tokens have been removed, users can use this function to withdraw their tokens separately of their rewards.
 
-**claimRewards** -> claims all earned rewards for sender
+**claimRewards** -> claims all earned rewards for sender.
 
 ## Owner functions
 
-**fundStaking** -> takes amount as param and funds staking contract
+**fundStaking** -> takes amount as param and funds staking contract.
 
-**closeRewards** -> marks staking as inactive and locks timestamp as the end of rewards
+**closeRewards** -> marks staking as inactive and locks timestamp as the end of rewards.
 
-**enableStaking** -> marks staking as active and allows deposits
+**enableStaking** -> marks staking as active and allows deposits.
+
+**updateMinimum** -> updates the minimum required stake.
 
 **withdrawRewardTokens** -> pulls reward tokens from contract after staking is complete. NOTE: this should only be called _after_ users have had enough time to withdraw their reward tokens. Since staked tokens and available rewards are tracked separately, contract owners _do not_ have the ability to withdraw user stakes.
