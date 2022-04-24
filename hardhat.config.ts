@@ -41,9 +41,9 @@ const config: HardhatUserConfig = {
     },
     hardhat: {
       chainId: 1337,
+      loggingEnabled: true,
       forking: {
-        url: process.env.ALCHEMY || "",
-        blockNumber: 14400000
+        url: process.env.ALCHEMY || ""
       }
     },
     ropsten: {
