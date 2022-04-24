@@ -770,6 +770,7 @@ library SafeMath {
     }
 }
 
+// solhint-disable not-rely-on-time, avoid-low-level-calls
 contract VentiStakeFull is Ownable {
     using SafeERC20 for IERC20;
 
@@ -777,6 +778,7 @@ contract VentiStakeFull is Ownable {
 
     uint256 private _totalSupply; // Total staked amount
     uint256 private _totalRewards;  // Total amount for rewards
+    uint256 private _stakeRequired = 100e18; // Minimum stake amount
 
     // Set standard contract data in ContractData struct
     ContractData private _data = ContractData({
@@ -903,6 +905,16 @@ contract VentiStakeFull is Ownable {
     function isActive() external view returns (bool)
     {
         return _data.isActive == 1;
+    }
+
+    /**
+     * @dev Check current minimum stake amount
+     *
+     * @return minimum the min stake amount
+     */
+    function getMinimumStake() external view returns (uint256)
+    {
+        return _stakeRequired;
     }
 
     /**
@@ -1052,6 +1064,8 @@ contract VentiStakeFull is Ownable {
         // Get existing user deposit. All 0s if non-existent
         UserDeposit storage userDeposit = _deposits[msg.sender];
 
+        require(userDeposit.staked + amount >= 100e18, "Need to meet minimum stake");
+
         // Transfer token
         stakingToken.transferFrom(msg.sender, address(this), amount);
 
@@ -1163,7 +1177,6 @@ contract VentiStakeFull is Ownable {
         require(_totalRewards == 0, "Use normal withdraw");
 
         // Get user deposit info
-        // UserDeposit memory userDeposit = _deposits[msg.sender];
         uint256 amountToWithdraw = _deposits[msg.sender].staked;
         require(amountToWithdraw > 0, "No stake to withdraw");
 
@@ -1200,6 +1213,18 @@ contract VentiStakeFull is Ownable {
         stakingToken.safeTransfer(msg.sender, amountToWithdraw);
 
         emit RewardsClaimed(amountToWithdraw);
+    }
+
+    /**
+     * @dev Update minimum stake amount
+     *
+     * @param minimum the new minimum stake account
+     */
+    function updateMinimum(uint256 minimum) external payable onlyOwner
+    {
+        _stakeRequired = minimum;
+        
+        emit MinimumUpdated(minimum);
     }
 
     /**
@@ -1269,4 +1294,5 @@ contract VentiStakeFull is Ownable {
     event RewardsClaimed(uint256 amount);
     event Deposited(address indexed account, uint256 amount);
     event Withdrawal(address indexed account, uint256 amount);
+    event MinimumUpdated(uint256 newMinimum);
 }
