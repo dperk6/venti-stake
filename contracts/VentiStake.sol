@@ -312,6 +312,10 @@ contract VentiStake is Ownable {
             // Save new deposit data
             userDeposit.staked += amount + combinedAmount;
             userDeposit.timestamp = uint64(block.timestamp);
+
+            if (lock > userDeposit.lock || block.timestamp > _getUnlockTime(userDeposit.timestamp, userDeposit.lock)) {
+                userDeposit.lock = lock;
+            }
         } else {
             // Create new deposit record for user with new lock time
             userDeposit.lock = lock;
