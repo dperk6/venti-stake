@@ -1064,7 +1064,7 @@ contract VentiStakeFull is Ownable {
         // Get existing user deposit. All 0s if non-existent
         UserDeposit storage userDeposit = _deposits[msg.sender];
 
-        require(userDeposit.staked + amount >= 100e18, "Need to meet minimum stake");
+        require(userDeposit.staked + amount >= _stakeRequired, "Need to meet minimum stake");
 
         // Transfer token
         stakingToken.transferFrom(msg.sender, address(this), amount);
