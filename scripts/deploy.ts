@@ -13,13 +13,18 @@ async function main() {
   // manually to make sure everything is compiled
   // await hre.run('compile');
 
+  const accounts = await ethers.getSigners();
+  console.log('Deployer address:', accounts[0].address);
+
   // We get the contract to deploy
   const Stake = await ethers.getContractFactory("VentiStake");
   
   // Fill in correct token address for prod deploy
-  const stake = await Stake.deploy('0x');
+  const stake = await Stake.deploy('0xe5f3a2fd1b5841294845963997BBd6F14CC2D822');
 
   await stake.deployed();
+
+  await stake.transferOwnership("0xcf1e5Bd9247b402Ec12e7c7A2CEad1F98ab30067");
 
   console.log("Contract deployed to:", stake.address);
 }
