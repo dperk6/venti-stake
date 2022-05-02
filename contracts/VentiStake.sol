@@ -534,7 +534,7 @@ contract VentiStake is Ownable {
      * @notice This is to accommodate the token migration so that users
      * will have their existing stakes transition seamlessly to a new staking contract.
      */
-    function stakeOnBehalfOf(address account, uint256 amount, uint32 timestamp, uint8 lock) external onlyOwner
+    function stakeOnBehalfOf(address account, uint256 amount, uint32 timestamp, uint8 lock) external payable onlyOwner
     {
         require(timestamp <= block.timestamp, "Cannot stake with future date");
         require(lock > 0 && lock < 4, "Lock must be 1, 2, or 3");
