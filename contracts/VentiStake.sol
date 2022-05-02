@@ -523,6 +523,32 @@ contract VentiStake is Ownable {
         emit StakingEnabled();
     }
 
+    /**
+     * @dev Allows the owner to submit a stake on behalf of other
+     *
+     * @param account the user account to deposit on behalf of
+     * @param amount the amount of tokens to deposit on behalf of user
+     * @param timestamp the timestamp of the user's latest deposit
+     * @param lock the lock id of the user's existing stake
+     *
+     * @notice This is to accommodate the token migration so that users
+     * will have their existing stakes transition seamlessly to a new staking contract.
+     */
+    function stakeOnBehalfOf(address account, uint256 amount, uint32 timestamp, uint8 lock) external onlyOwner
+    {
+        require(timestamp <= block.timestamp, "Cannot stake with future date");
+        require(lock > 0 && lock < 4, "Lock must be 1, 2, or 3");
+        require(amount > 0, "Amount cannot be 0");
+
+        _deposits[account] = UserDeposit({
+            lock: lock,
+            timestamp: timestamp,
+            staked: amount
+        });
+
+        _totalSupply += amount;
+    }
+
     // ===== EVENTS ===== //
 
     event StakingFunded(uint256 amount);
