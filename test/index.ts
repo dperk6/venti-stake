@@ -231,5 +231,15 @@ describe("VentiStake", function () {
     // Should be no staked amount left in contract
     expect(await ventiStake.totalSupply()).to.equal(0);
 
+    await ventiStake.stakeOnBehalfOf(signers[5].address, "8820000000000000000000", "1650910002", "3");
+    await ethers.provider.send('evm_mine', []);
+    expect(await ventiStake.totalSupply()).to.equal(BigNumber.from("8820000000000000000000"));
   });
+
+  // it("Should test stakeOnBehalfOf function", async function() {
+  //   await ventiStake.stakeOnBehalfOf("0xb95f557b313cd58073914ca0fb8d18eea8b73f40", "8820000000000000000000", "1650910002", "3");
+  //   console.log(await ventiStake.pendingReward("0xb95f557b313cd58073914ca0fb8d18eea8b73f40"));
+
+  //   expect(await ventiStake.totalSupply()).to.equal(BigNumber.from("8820000000000000000000"));
+  // });
 });
