@@ -33,6 +33,11 @@ const config: HardhatUserConfig = {
     }
   },
   networks: {
+    hardhat: {
+      forking: {
+        url: process.env.ALCHEMY || ""
+      }
+    },
     mainnet: {
       url: process.env.ALCHEMY || "",
       accounts: {
