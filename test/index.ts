@@ -12,11 +12,10 @@ describe("VentiStake", function () {
   beforeEach(async function () {
     signers = await ethers.getSigners();
     
-    const VentiStake = await ethers.getContractFactory("VentiStakeFull");
+    const VentiStake = await ethers.getContractFactory("VentiStake");
     const Token = await ethers.getContractFactory("TestToken");
     token = await Token.deploy("21000000000000000000000000");
-    await token.deployed();
-
+    const tx = await token.deployed();
     ventiStake = await VentiStake.deploy(token.address);
     await ventiStake.deployed();
 
@@ -231,15 +230,10 @@ describe("VentiStake", function () {
     // Should be no staked amount left in contract
     expect(await ventiStake.totalSupply()).to.equal(0);
 
-    await ventiStake.stakeOnBehalfOf(signers[5].address, "8820000000000000000000", "1650910002", "3");
+    const tx = await ventiStake.stakeOnBehalfOf(signers[5].address, "8820000000000000000000", "1650910002", "3");
     await ethers.provider.send('evm_mine', []);
+    // For some reason gas-reporter doesn't show gas usage unless we get receipt???
+    const receipt = await ethers.provider.getTransactionReceipt(tx.hash);
     expect(await ventiStake.totalSupply()).to.equal(BigNumber.from("8820000000000000000000"));
   });
-
-  // it("Should test stakeOnBehalfOf function", async function() {
-  //   await ventiStake.stakeOnBehalfOf("0xb95f557b313cd58073914ca0fb8d18eea8b73f40", "8820000000000000000000", "1650910002", "3");
-  //   console.log(await ventiStake.pendingReward("0xb95f557b313cd58073914ca0fb8d18eea8b73f40"));
-
-  //   expect(await ventiStake.totalSupply()).to.equal(BigNumber.from("8820000000000000000000"));
-  // });
 });

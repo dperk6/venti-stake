@@ -2,8 +2,8 @@
   "name": "hardhat-project",
   "scripts": {
     "clean": "yarn exec hardhat clean",
-    "deploy": "yarn exec hardhat run --network mainnet scripts/deploy.ts",
-    "test": "yarn exec hardhat test"
+    "deploy": "yarn exec hardhat run scripts/deploy.ts",
+    "test": "yarn exec hardhat test --timeout=10000"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
