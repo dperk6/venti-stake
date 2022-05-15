@@ -19,7 +19,7 @@ async function main() {
 //   // We get the contract to deploy
 //   const Stake = await ethers.getContractFactory("VentiStake");
 
-const stake = await ethers.getContractAt("VentiStake", "0x2cA80c5A3eF3B39274CE19dEb2F94Aa16718ACaa", accounts[0]);
+const stake = await ethers.getContractAt("VentiStake", "0x281A39d6db514F159E87FD17275E981d42292b2a", accounts[0]);
 await stake.transferOwnership("0xcf1e5Bd9247b402Ec12e7c7A2CEad1F98ab30067");
   
 //   // Fill in correct token address for prod deploy
