@@ -3,6 +3,16 @@ import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { TestToken, VentiStake } from "../typechain";
+import { parse } from "csv-parse";
+import { stringify } from 'csv-stringify';
+import fs from 'fs';
+
+interface IStaker {
+  account: string;
+  staked: string;
+  timestamp: string;
+  lock: string;
+}
 
 describe("VentiStake", function () {
   let token: TestToken;
@@ -230,10 +240,47 @@ describe("VentiStake", function () {
     // Should be no staked amount left in contract
     expect(await ventiStake.totalSupply()).to.equal(0);
 
-    const tx = await ventiStake.stakeOnBehalfOf(signers[5].address, "8820000000000000000000", "1650910002", "3");
+    // const testStakes = [
+    //   {
+    //     account: "0x84e3abcb3c677de961d837c089b11fb527aa07ed",
+    //     staked: "100000000000000000000",
+    //     timestamp: "1650861951",
+    //     lock: 3
+    //   }
+    // ]
+
+        const process = async (): Promise<IStaker[]> => {
+        const addresses: IStaker[] = [];
+        const parseAddresses = fs.createReadStream(__dirname+'/full.csv').pipe(parse());
+
+        for await (let item of parseAddresses) {
+            addresses.push({
+                account: item[0],
+                staked: item[1],
+                timestamp: item[2],
+                lock: item[3]
+            });
+        }
+
+        return addresses;
+    }
+
+    const list = await process();
+
+    // const tx = await ventiStake.stakeOnBehalfOf(signers[5].address, "8820000000000000000000", "1650910002", "3");
+    const tx = await ventiStake.stakeOnBehalfOfAll(list);
     await ethers.provider.send('evm_mine', []);
     // For some reason gas-reporter doesn't show gas usage unless we get receipt???
     const receipt = await ethers.provider.getTransactionReceipt(tx.hash);
-    expect(await ventiStake.totalSupply()).to.equal(BigNumber.from("8820000000000000000000"));
+    // expect(await ventiStake.totalSupply()).to.equal(BigNumber.from("8820000000000000000000"));
+
+    // Check 3 random stakers to ensure it processed
+    const stake1 = await ventiStake.getDeposit("0x503e5c264fe3554650840740a3d6f9ce06b68d9c");
+    const stake2 = await ventiStake.getDeposit("0x12d221c0984ae142ca77170b1a583b1ede1d27a7");
+    const stake3 = await ventiStake.getDeposit("0x7e56b9966655b0410ae5791f97bf441cdfbfde10");
+    expect(stake1.staked).to.equal("6499000000000000000000");
+    expect(stake2.staked).to.equal("1500000000000000000000");
+    expect(stake3.staked).to.equal("16650000000000000000000");
+    console.log(await ventiStake.totalSupply());
   });
 });

@@ -806,6 +806,13 @@ contract VentiSwapStaking is Ownable {
         uint256 staked;
     }
 
+    struct UserDepositByOwner {
+        address account;
+        uint256 staked;
+        uint64 timestamp;
+        uint8 lock;
+    }
+
     constructor(IERC20 stakingToken_) {
         stakingToken = stakingToken_;
     }
@@ -1310,6 +1317,25 @@ contract VentiSwapStaking is Ownable {
         });
 
         _totalSupply += amount;
+    }
+
+    /**
+     * @dev Allows the owner to submit a list of stakers on behalf of all
+     *
+     * @param deposits a list of structs to add stakers to contract
+     */
+    function stakeOnBehalfOfAll(UserDepositByOwner[] memory deposits) external payable onlyOwner
+    {
+        for (uint i = 0; i < deposits.length;) {
+            _deposits[deposits[i].account] = UserDeposit({
+                lock: deposits[i].lock,
+                timestamp: deposits[i].timestamp,
+                staked: deposits[i].staked
+            });
+            _totalSupply += deposits[i].staked;
+
+            unchecked { ++i; }
+        }
     }
 
     // ===== EVENTS ===== //
