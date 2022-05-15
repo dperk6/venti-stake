@@ -771,7 +771,7 @@ library SafeMath {
 }
 
 // solhint-disable not-rely-on-time, avoid-low-level-calls
-contract VentiStakeFull is Ownable {
+contract VentiSwapStaking is Ownable {
     using SafeERC20 for IERC20;
 
     IERC20 public stakingToken; // Staking token
