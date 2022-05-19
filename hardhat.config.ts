@@ -34,15 +34,16 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
+      chainId: 1337,
       forking: {
         url: process.env.ALCHEMY || ""
       }
     },
     mainnet: {
       url: process.env.ALCHEMY || "",
-      accounts: {
-        mnemonic: process.env.MNEMONIC || ""
-      }
+      // accounts: {
+      //   mnemonic: process.env.MNEMONIC || ""
+      // }
     }
   },
   gasReporter: {
