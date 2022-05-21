@@ -12,9 +12,15 @@ const VST = "0xb7C2fcD6d7922eddd2A7A9B0524074A60D5b472C";
 async function main() {
     const signers = await ethers.getSigners();
     const Stake = await ethers.getContractFactory('VentiSwapStaking');
+    const Token = await ethers.getContractFactory('TestToken');
+    const token = await Token.attach('0xb7C2fcD6d7922eddd2A7A9B0524074A60D5b472C');
     const stake = Stake.attach("0x281A39d6db514F159E87FD17275E981d42292b2a");
     await makeSwap(signers[0], [WETH,VST], '1.0');
-    console.log(await stake.totalSupply());
+    await token.approve(stake.address, ethers.constants.MaxUint256);
+    await stake.deposit(await token.balanceOf(signers[0].address), 1);
+    // Increase by 1 month + 1 second
+    await ethers.provider.send("evm_increaseTime", [2628001]);
+    await ethers.provider.send('evm_mine', []);
     await run("node");
 }
 
